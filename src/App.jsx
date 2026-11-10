@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
-import MultiSelectQuestion from './components/MultiSelectQuestion.jsx'
 import ProgressBar from './components/ProgressBar.jsx'
 import SceneIllustration from './components/SceneIllustration.jsx'
+import RevealCards from './components/RevealCards.jsx'
+import SortActivity from './components/SortActivity.jsx'
+import BranchingScenario from './components/BranchingScenario.jsx'
+import ActionPlan from './components/ActionPlan.jsx'
+import CaseCompare from './components/CaseCompare.jsx'
 import { courseStages } from './content/course.js'
 
 function Welcome({ onStart, finished }) {
@@ -47,14 +51,8 @@ function Welcome({ onStart, finished }) {
 
 function App() {
   const [currentStep, setCurrentStep] = useState(-1)
-  const [answers, setAnswers] = useState({})
-  const [submitted, setSubmitted] = useState({})
-  const [classifications, setClassifications] = useState({})
-  const [classificationSubmitted, setClassificationSubmitted] = useState(false)
   const [finished, setFinished] = useState(false)
   const stage = currentStep >= 0 ? courseStages[currentStep] : null
-  const submittedForStage = stage ? Boolean(submitted[stage.id]) : false
-  const selectedAnswers = stage ? answers[stage.id] ?? [] : []
 
   useEffect(() => {
     if (currentStep >= 0) document.getElementById('stage-title')?.focus()
@@ -62,31 +60,7 @@ function App() {
 
   function startCourse() {
     setFinished(false)
-    setAnswers({})
-    setSubmitted({})
-    setClassifications({})
-    setClassificationSubmitted(false)
     setCurrentStep(0)
-  }
-
-  function toggleAnswer(optionId) {
-    if (!stage || submittedForStage) return
-    setAnswers((previous) => {
-      const current = previous[stage.id] ?? []
-      const updated = current.includes(optionId)
-        ? current.filter((id) => id !== optionId)
-        : [...current, optionId]
-      return { ...previous, [stage.id]: updated }
-    })
-  }
-
-  function submitActivity() {
-    if (!stage) return
-    if (stage.type === 'classify') {
-      setClassificationSubmitted(true)
-    } else {
-      setSubmitted((previous) => ({ ...previous, [stage.id]: true }))
-    }
   }
 
   function goNext() {
@@ -101,23 +75,6 @@ function App() {
   function goPrevious() {
     setCurrentStep((step) => Math.max(step - 1, 0))
   }
-
-  const activityReady = stage?.type === 'multi-select'
-    ? selectedAnswers.length > 0
-    : stage?.type === 'classify'
-      ? stage.situations.every((situation) => classifications[situation.id])
-      : true
-  const mayContinue = stage?.type === 'multi-select'
-    ? submittedForStage
-    : stage?.type === 'classify'
-      ? classificationSubmitted
-      : true
-  const answerIsCorrect = stage?.type === 'multi-select'
-    ? selectedAnswers.length === stage.correct.length && stage.correct.every((id) => selectedAnswers.includes(id))
-    : false
-  const classificationIsCorrect = stage?.type === 'classify'
-    ? stage.situations.every((situation) => classifications[situation.id] === situation.answer)
-    : false
 
   return (
     <main className="page-shell">
@@ -162,127 +119,50 @@ function App() {
             {stage.type === 'resource' && (
               <div className="resource-layout">
                 <SceneIllustration kind={stage.visual} />
-                <div className="resource-card">
-                  <span className="resource-icon" aria-hidden="true">↗</span>
-                  <div>
-                    <p className="card-label">RESSOURCE OFFICIELLE</p>
-                    <h2>{stage.resourceTitle}</h2>
-                    <p>{stage.resourceSource}</p>
+                <div className="resource-content">
+                  <RevealCards cards={stage.cards} />
+                  <div className="resource-card">
+                    <span className="resource-icon" aria-hidden="true">↗</span>
+                    <div>
+                      <p className="card-label">POUR ALLER PLUS LOIN</p>
+                      <h2>{stage.resourceTitle}</h2>
+                      <p>{stage.resourceSource}</p>
+                    </div>
+                    <a className="resource-link" href={stage.resourceUrl} target="_blank" rel="noreferrer">
+                      Ouvrir l’infographie <span aria-hidden="true">↗</span>
+                    </a>
                   </div>
-                  <a className="resource-link" href={stage.resourceUrl} target="_blank" rel="noreferrer">
-                    Ouvrir l’infographie <span aria-hidden="true">↗</span>
-                  </a>
                 </div>
               </div>
             )}
 
-            {stage.type === 'multi-select' && (
+            {stage.type === 'sort' && (
               <div className="activity-block">
-                {stage.conversation && (
-                  <div className="conversation-scene-row">
-                    <SceneIllustration kind={stage.visual} compact />
-                    <div className="conversation" aria-label="Conversation fictive entre Nathan, Emma et Lucas">
-                      {stage.conversation.map((line, index) => (
-                        <p className={`chat-line chat-${index % 2}`} key={`${line.speaker}-${index}`}>
-                          <strong>{line.speaker}</strong><span>{line.text}</span>
-                        </p>
-                      ))}
-                    </div>
+                <div className="conversation-scene-row">
+                  <SceneIllustration kind={stage.visual} compact />
+                  <div className="conversation" aria-label="Conversation fictive entre Nathan, Emma et Lucas">
+                    {stage.conversation.map((line, index) => (
+                      <p className={`chat-line chat-${index % 2}`} key={`${line.speaker}-${index}`}>
+                        <strong>{line.speaker}</strong><span>{line.text}</span>
+                      </p>
+                    ))}
                   </div>
-                )}
-                {stage.facts && (
-                  <div className="assessment-scene">
-                    <SceneIllustration kind={stage.visual} compact />
-                    <div className="fact-grid" aria-label="Indices dans la situation d’Inès">
-                      {stage.facts.map((fact) => (
-                        <div className="fact-card" key={fact.title}>
-                          <span aria-hidden="true">{fact.icon}</span>
-                          <div><strong>{fact.title}</strong><p>{fact.text}</p></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <MultiSelectQuestion
-                  question={stage.question}
-                  options={stage.options}
-                  selected={selectedAnswers}
-                  onToggle={toggleAnswer}
-                  submitted={submittedForStage}
-                  correct={stage.correct}
-                />
-                {!submittedForStage ? (
-                  <button className="secondary-button" onClick={submitActivity} disabled={!activityReady}>
-                    Vérifier mes réponses
-                  </button>
-                ) : (
-                  <div className={`feedback-box ${answerIsCorrect ? 'feedback-success' : 'feedback-review'}`} role="status">
-                    <strong>{answerIsCorrect ? 'Bien joué !' : 'Regardons les indices ensemble'}</strong>
-                    <p>{stage.feedback}</p>
-                  </div>
-                )}
+                </div>
+                <SortActivity items={stage.items} />
               </div>
             )}
 
-            {stage.type === 'classify' && (
-              <div className="activity-block classification-list">
-                {stage.situations.map((situation) => {
-                  const correct = classifications[situation.id] === situation.answer
-                  const incorrect = classificationSubmitted && !correct
-                  return (
-                    <fieldset className={`scenario-card ${classificationSubmitted ? (correct ? 'scenario-correct' : 'scenario-review') : ''}`} key={situation.id}>
-                      <legend><span className="scenario-letter">{situation.id}</span>{situation.title}</legend>
-                      <SceneIllustration kind={situation.visual} compact />
-                      <p>{situation.text}</p>
-                      <label className="select-label" htmlFor={`category-${situation.id}`}>Catégorie</label>
-                      <select
-                        id={`category-${situation.id}`}
-                        value={classifications[situation.id] ?? ''}
-                        disabled={classificationSubmitted}
-                        onChange={(event) => setClassifications((previous) => ({ ...previous, [situation.id]: event.target.value }))}
-                      >
-                        <option value="" disabled>Choisir une catégorie</option>
-                        {stage.categories.map((category) => <option key={category} value={category}>{category}</option>)}
-                      </select>
-                      {classificationSubmitted && (
-                        <div className="scenario-feedback" role="status">
-                          <strong>{correct ? 'Catégorie attendue' : `Catégorie attendue : ${situation.answer}`}</strong>
-                          <p>{situation.feedback}</p>
-                        </div>
-                      )}
-                      {incorrect && <span className="sr-only">La catégorie choisie ne correspond pas à la réponse attendue.</span>}
-                    </fieldset>
-                  )
-                })}
-                {!classificationSubmitted ? (
-                  <button className="secondary-button" onClick={submitActivity} disabled={!activityReady}>
-                    Afficher la correction
-                  </button>
-                ) : (
-                  <div className={`feedback-box ${classificationIsCorrect ? 'feedback-success' : 'feedback-review'}`} role="status">
-                    <strong>{classificationIsCorrect ? 'Tout est bien classé !' : 'Compare tes choix avec les corrections.'}</strong>
-                    <p>Une situation possible se repère à partir de plusieurs indices et de leur contexte.</p>
-                  </div>
-                )}
-              </div>
-            )}
+            {stage.type === 'compare' && <CaseCompare situations={stage.situations} />}
+
+            {stage.type === 'branch' && <BranchingScenario scenario={stage.scenario} />}
 
             {stage.type === 'summary' && (
-              <div className="goal-panel summary-panel">
-                <h2>Les repères essentiels</h2>
-                <div className="summary-layout">
-                  <SceneIllustration kind={stage.visual} />
-                  <ul className="takeaway-list">
-                    {stage.takeaways.map((takeaway) => <li key={takeaway}>{takeaway}</li>)}
-                  </ul>
-                </div>
-                <p className="help-callout"><span aria-hidden="true">♡</span>{stage.help}</p>
-              </div>
+              <ActionPlan stage={stage} />
             )}
 
             <nav className="lesson-navigation" aria-label="Navigation de la capsule">
               <button className="back-button" onClick={goPrevious} disabled={currentStep === 0}>← Précédent</button>
-              <button className="start-button" onClick={goNext} disabled={!mayContinue}>
+              <button className="start-button" onClick={goNext}>
                 {currentStep === courseStages.length - 1 ? 'Terminer la capsule' : 'Continuer'}
                 <span aria-hidden="true">→</span>
               </button>
